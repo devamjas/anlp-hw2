@@ -24,7 +24,7 @@ def main():
     while True:
         scores = results()
         lines = [time.strftime("%H:%M:%S") + "  (Ctrl+C to exit)", ""]
-        for path in sorted(glob.glob("outputs/*.progress") + glob.glob("system_outputs/*.progress"),
+        for path in sorted(glob.glob("outputs/*.progress") + glob.glob("../system_outputs/*.progress"),
                            key=os.path.getmtime):
             done, total = map(int, open(path).read().split("/"))
             name = os.path.basename(path).replace(".progress", "")

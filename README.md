@@ -1,6 +1,29 @@
 # RAG for Pittsburgh and CMU
 
-Retrieval-augmented question answering over a self-collected knowledge base about Pittsburgh and Carnegie Mellon University (11-711 Advanced NLP, HW2). The original assignment handout is in `HANDOUT.md`.
+Retrieval-augmented question answering over a self-collected knowledge base about Pittsburgh and Carnegie Mellon University (11-711 Advanced NLP, HW2).
+
+## Repository layout
+
+The top level follows the submission layout from the handout; everything else is in `extras/`.
+
+```
+github.txt                 repository link
+README.md
+system_outputs/            final outputs on the 250-question test set (system_output_{1,2,3}.json)
+extras/
+├── src/                   data collection and RAG code
+├── scripts/               dev-set experiment runner, live progress bars
+├── cloud/                 Colab notebook for the 14B reader
+├── data/raw/              collected knowledge base (*.jsonl)
+├── outputs/               dev predictions, traces, dev_results.jsonl
+├── leaderboard/           leaderboard submissions and traces
+├── latex/report/          report source (ACL template)
+├── *.json                 dev, leaderboard and test question sets
+├── requirements.txt
+└── HANDOUT.md             assignment handout
+```
+
+All commands below run from `extras/`, and paths in the tables are relative to it.
 
 ## Pipeline
 
@@ -37,7 +60,8 @@ cmoa.py (CMOA open collection data) ────┤
 
 ```
 conda create -p ./.venv python=3.11
-./.venv/bin/pip install -r requirements.txt
+./.venv/bin/pip install -r extras/requirements.txt
+cd extras
 ```
 
 Apple Silicon is required for the MLX reader.
@@ -45,22 +69,22 @@ Apple Silicon is required for the MLX reader.
 ## Build the knowledge base
 
 ```
-./.venv/bin/python -m src.data_collection.run
+../.venv/bin/python -m src.data_collection.run
 mkdir -p data/external/cmoa
 curl -L -o data/external/cmoa/cmoa.csv https://raw.githubusercontent.com/roll/collection/master/cmoa.csv
-./.venv/bin/python -m src.data_collection.cmoa
-./.venv/bin/python -m src.data_collection.coverage
+../.venv/bin/python -m src.data_collection.cmoa
+../.venv/bin/python -m src.data_collection.coverage
 ```
 
 ## Index, evaluate, predict
 
 ```
-./.venv/bin/python -m src.rag.run build --words 100 --overlap 20 --index data/index/c100v2
-./.venv/bin/python -m src.rag.run build --words 200 --overlap 40 --index data/index/c200
-./.venv/bin/python -m src.rag.run retrieval-eval --index data/index/c100v2
+../.venv/bin/python -m src.rag.run build --words 100 --overlap 20 --index data/index/c100v2
+../.venv/bin/python -m src.rag.run build --words 200 --overlap 40 --index data/index/c200
+../.venv/bin/python -m src.rag.run retrieval-eval --index data/index/c100v2
 bash scripts/experiments.sh
-./.venv/bin/python -m src.rag.run answer --questions test_set_day_3.json --index data/index/c100v2 \
-    --mode rrf --k 5 --fallback --style adaptive --out system_outputs_day3/system_output_1.json
+../.venv/bin/python -m src.rag.run answer --questions test_set_day_3.json --index data/index/c100v2 \
+    --mode rrf --k 5 --fallback --style adaptive --out ../system_outputs/system_output_1.json
 ```
 
 ## Corpus
@@ -94,10 +118,9 @@ The final corpus adds 1,172 Wikipedia articles (category and list pages), Arcade
 
 | File | Configuration |
 |---|---|
-| `system_outputs_day3/system_output_1.json` | final corpus, RRF + fallback, adaptive |
-| `system_outputs_day3/system_output_2.json` | final corpus, RRF + fallback, short |
-| `system_outputs_day3/system_output_3.json` | final corpus, RRF + fallback, adaptive, Qwen2.5-14B reader with 7B backup |
-| `system_outputs/system_output_{1,2}.json` | day-2 test set, earlier 200-word systems |
+| `../system_outputs/system_output_1.json` | final corpus, RRF + fallback, adaptive |
+| `../system_outputs/system_output_2.json` | final corpus, RRF + fallback, short |
+| `../system_outputs/system_output_3.json` | final corpus, RRF + fallback, adaptive, Qwen2.5-14B reader with 7B backup |
 
 Fallback: when the reader answers "unknown" or similar, retry with twice as many chunks, then closed-book.
 

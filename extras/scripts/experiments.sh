@@ -2,7 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-PY=./.venv/bin/python
+PY=../.venv/bin/python
 RESULTS=outputs/dev_results.jsonl
 mkdir -p outputs
 

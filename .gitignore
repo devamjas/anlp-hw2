@@ -2,11 +2,11 @@
 __pycache__/
 *.pyc
 .DS_Store
-data/cache/
-data/index/
-data/external/
 *.progress
 PROJECT_NOTES.md
-cloud/prompts.jsonl
-cloud/answers.json
 BEST_SCORE_RECIPE.md
+extras/data/cache/
+extras/data/index/
+extras/data/external/
+extras/cloud/prompts.jsonl
+extras/cloud/answers.json

@@ -17,7 +17,7 @@ JOBS = [
 BACKUP = {
     "leaderboard|sentence": "leaderboard/leaderboard_devamjas_v3_sentence.json",
     "dev|adaptive": "outputs/dev_c100v2_rrf_adaptive.json",
-    "test|adaptive": "system_outputs_day3/system_output_1.json",
+    "test|adaptive": "../system_outputs/system_output_1.json",
 }
 
 
