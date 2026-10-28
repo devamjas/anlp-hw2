@@ -24,6 +24,7 @@ BACKUP = {
 def cmd_export(args):
     from .retrieve import Retriever
     retriever = Retriever(args.index)
+    Path(args.prompts).parent.mkdir(parents=True, exist_ok=True)
     with open(args.prompts, "w", encoding="utf-8") as out:
         for name, path, styles in JOBS:
             for q in tqdm(json.load(open(path)), desc=name):

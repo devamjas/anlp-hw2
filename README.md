@@ -13,11 +13,9 @@ system_outputs/            final outputs on the 250-question test set (system_ou
 extras/
 ├── src/                   data collection and RAG code
 ├── scripts/               dev-set experiment runner, live progress bars
-├── cloud/                 Colab notebook for the 14B reader
 ├── data/raw/              collected knowledge base (*.jsonl)
 ├── outputs/               dev predictions, traces, dev_results.jsonl
 ├── leaderboard/           leaderboard submissions and traces
-├── latex/report/          report source (ACL template)
 ├── *.json                 dev, leaderboard and test question sets
 ├── requirements.txt
 └── HANDOUT.md             assignment handout
@@ -52,7 +50,7 @@ cmoa.py (CMOA open collection data) ────┤
 | `src/rag/retrieve.py` | BM25 (`bm25s`), dense (`BAAI/bge-small-en-v1.5` + FAISS), reciprocal rank fusion, weighted score fusion, cross-encoder rerank (`BAAI/bge-reranker-base`) |
 | `src/rag/reader.py` | `Qwen2.5-7B-Instruct` (4-bit, MLX); short answers, or one sentence for descriptive questions when adaptive |
 | `src/rag/run.py` | `build`, `answer`, `retrieval-eval` commands |
-| `src/rag/remote.py`, `cloud/cloud_reader.ipynb` | Export prompts, run a larger reader on Colab, import its answers |
+| `src/rag/remote.py` | Export prompts for a larger reader on a cloud GPU, import its answers |
 | `scripts/experiments.sh` | All dev-set runs |
 | `scripts/progress.py` | Live progress bars for running jobs |
 
@@ -137,4 +135,4 @@ Answer style: `short` returns a bare answer; `sentence` always returns one sente
 
 ## Larger reader on a cloud GPU
 
-`src/rag/remote.py export` writes the retrieved prompts to `cloud/prompts.jsonl`; `cloud/cloud_reader.ipynb` answers them with Qwen2.5-14B-Instruct (4-bit) on a Colab T4, saving progress to Google Drive; `src/rag/remote.py import` scores the answers, using the 7B outputs for any question the 14B model left unanswered or refused.
+`src/rag/remote.py export` writes the retrieved prompts to `cloud/prompts.jsonl`; a Colab T4 notebook answered them with Qwen2.5-14B-Instruct (4-bit, batched greedy decoding, progress saved to Google Drive); `src/rag/remote.py import` scores the answers, using the 7B outputs for any question the 14B model left unanswered or refused.
