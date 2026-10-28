@@ -96,7 +96,7 @@ The final corpus adds 1,172 Wikipedia articles (category and list pages), Arcade
 |---|---|
 | `system_outputs_day3/system_output_1.json` | final corpus, RRF + fallback, adaptive |
 | `system_outputs_day3/system_output_2.json` | final corpus, RRF + fallback, short |
-| `system_outputs_day3/system_output_3.json` | final corpus, weighted + rerank + fallback, adaptive |
+| `system_outputs_day3/system_output_3.json` | final corpus, RRF + fallback, adaptive, Qwen2.5-14B reader with 7B backup |
 | `system_outputs/system_output_{1,2}.json` | day-2 test set, earlier 200-word systems |
 
 Fallback: when the reader answers "unknown" or similar, retry with twice as many chunks, then closed-book.

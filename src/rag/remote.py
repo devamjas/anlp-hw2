@@ -62,7 +62,7 @@ def cmd_import(args):
                 out = f"leaderboard/leaderboard_devamjas_{tag}_{style}.json"
                 preds = {"andrewid": "devamjas", **preds}
             else:
-                out = f"system_outputs_{tag}/test_day3_{style}.json"
+                out = f"outputs/test_day3_{tag}_{style}.json"
             Path(out).parent.mkdir(parents=True, exist_ok=True)
             json.dump(preds, open(out, "w"), indent=2, ensure_ascii=False)
             print("wrote", out)

@@ -204,7 +204,7 @@ All dev numbers are on \texttt{public\_evaluation\_data.json} ($n{=}157$) with o
 
 \paragraph{Leaderboard.} The leaderboard (150 different questions, hidden answers) reports F1, recall, ROUGE averaged over ROUGE-1/2/L, and an LLM judge (1--5), and ranks by the mean of the four after rescaling the judge to $[0,1]$. Our first submission (100-word chunks, RRF, adaptive, before the Wikipedia expansion) scored 41.71 total: F1 40.54, recall 38.14, ROUGE 34.01, judge 3.17. The final system scored 46.16: F1 44.22, recall 42.26, ROUGE 36.98, judge 3.45. The broader Wikipedia mainly helps the leaderboard's general-history questions. On the leaderboard our recall is slightly below our F1, while near the top of the board recall exceeds F1 by about 20 points. The leaderboard's references are therefore longer than our answers, unlike most dev references. Switching the same system to sentence answers confirmed this. Total rose to 56.27 (F1 49.42, recall 69.14, ROUGE 43.84, judge 3.51), and F1 rose as well, which happens only when the references themselves are sentences. On dev the same switch cost 34 F1 points: the best answer format depends on how the references were written, and the two sets were written differently. A fourth submission with the 14B reader (and 7B backup) scored 54.99 (F1 46.33, recall 70.16, ROUGE 40.81, judge 3.51). Recall rose by one point, but its sentences were longer (20 vs.\ 16 words on average), which cost three points each of F1 and ROUGE. The judge score was unchanged, so the larger reader did not make answers more correct here, only wordier.
 
-\paragraph{Test submissions.} For the 250-question test set, \texttt{system\_output\_1} is the final system, \texttt{system\_output\_2} the same system with short answers, and \texttt{system\_output\_3} the same system with weighted fusion plus reranking.
+\paragraph{Test submissions.} For the 250-question test set, \texttt{system\_output\_1} is the final system, \texttt{system\_output\_2} the same system with short answers, and \texttt{system\_output\_3} the same system with the 14B reader and 7B backup, the best system on dev.
 
 \section{Analysis}
 \label{sec:analysis}
@@ -215,23 +215,23 @@ We assigned dev questions to six categories with keyword rules on the question t
 
 \begin{table}[t]
   \centering
-  \small
-  \setlength{\tabcolsep}{3.5pt}
-  \begin{tabular}{lrrrrr}
+  \footnotesize
+  \setlength{\tabcolsep}{2.5pt}
+  \begin{tabular}{lrrrrrrr}
     \toprule
-    Category & $n$ & Closed & BM25 & Dense & Final \\
+    Category & $n$ & Closed & BM25 & Dense & RRF & Wtd. & Final \\
     \midrule
-    CMOA artwork & 59 & 11.3 & 74.3 & 76.1 & 73.8 \\
-    Sports & 33 & 8.5 & 53.6 & 48.4 & 70.0 \\
-    General/history & 32 & 11.2 & 22.6 & 17.4 & 36.5 \\
-    Events & 16 & 18.1 & 50.3 & 39.3 & 52.4 \\
-    Gov./tax & 10 & 12.2 & 49.0 & 22.7 & 64.9 \\
-    Food & 7 & 8.5 & 2.4 & 6.2 & 27.2 \\
+    CMOA artwork & 59 & 11.3 & 74.3 & 76.1 & 74.6 & 76.4 & 73.8 \\
+    Sports & 33 & 8.5 & 53.6 & 48.4 & 57.5 & 57.5 & 70.0 \\
+    General/history & 32 & 11.2 & 22.6 & 17.4 & 18.4 & 22.5 & 36.5 \\
+    Events & 16 & 18.1 & 50.3 & 39.3 & 41.0 & 50.3 & 52.4 \\
+    Gov./tax & 10 & 12.2 & 49.0 & 22.7 & 30.7 & 40.7 & 64.9 \\
+    Food & 7 & 8.5 & 2.4 & 6.2 & 8.4 & 4.1 & 27.2 \\
     \midrule
-    All & 157 & 11.3 & 52.2 & 48.0 & 60.6 \\
+    All & 157 & 11.3 & 52.2 & 48.0 & 50.4 & 53.3 & 60.6 \\
     \bottomrule
   \end{tabular}
-  \caption{F1 by question category on the dev set. BM25 and Dense use 200-word chunks; Final is the full system.}
+  \caption{F1 by question category on the dev set. BM25, Dense, RRF and weighted fusion (Wtd., $\alpha{=}0.5$) use 200-word chunks without fallback; Final is the full system.}
   \label{tab:category}
 \end{table}
 
@@ -250,7 +250,7 @@ Retrieval improves 113 of 157 questions, leaves 34 unchanged and hurts 10. The g
 
 \subsection{Dense, sparse, and hybrid}
 
-BM25 beats dense end to end (52.2 vs 48.0 F1). On question pairs, BM25 wins 22 times and dense 18. BM25 wins concentrate in general-history (9) and government/tax (5), where questions share rare exact terms with the answer text (``Payroll Expense Tax'', ``Duquesne Incline''). Dense wins are spread out and include food questions, which are phrased descriptively (``authentic Brazilian steakhouse experience''). On CMOA both are strong, because the quoted title is also a strong semantic match. Of the two fusions, RRF retrieves slightly better (54.8 vs 54.1 hit rate) yet weighted fusion answers better (53.3 vs 50.4 F1). Hit rate only asks whether the answer is somewhere in the top 5. Weighted fusion keeps BM25's high-confidence exact matches at the top, while RRF can promote a dense-only distractor to rank 1. With 100-word chunks RRF also retrieves better (58.0 vs 57.3). We did not rerun weighted fusion end to end at that size, and kept RRF.
+BM25 beats dense end to end (52.2 vs 48.0 F1). On question pairs, BM25 wins 22 times and dense 18. BM25 wins concentrate in general-history (9) and government/tax (5), where questions share rare exact terms with the answer text (``Payroll Expense Tax'', ``Duquesne Incline''). Dense wins are spread out and include food questions, which are phrased descriptively (``authentic Brazilian steakhouse experience''). On CMOA both are strong, because the quoted title is also a strong semantic match. Of the two fusions, RRF retrieves slightly better (54.8 vs 54.1 hit rate) yet weighted fusion answers better (53.3 vs 50.4 F1). Hit rate only asks whether the answer is somewhere in the top 5. Weighted fusion keeps BM25's high-confidence exact matches at the top, while RRF can promote a dense-only distractor to rank 1. By category (Table~\ref{tab:category}), the two fusions tie on sports, and weighted fusion is ahead on events (+9.3), government/tax (+10.0) and general history (+4.1). These are the categories where dense retrieval is far weaker than BM25. RRF gives the weak list an equal vote by rank, while weighted fusion lets BM25's much larger scores dominate. Fusion clearly beats both single retrievers only on sports (+3.9 over BM25 for either fusion). On CMOA all four retrievers are within 2.1 points. RRF is ahead only on food (7 questions, all near zero). With 100-word chunks RRF also retrieves better (58.0 vs 57.3). We did not rerun weighted fusion end to end at that size, and kept RRF.
 
 \subsection{Example outputs}
 
