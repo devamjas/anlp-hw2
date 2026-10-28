@@ -65,7 +65,7 @@ bash scripts/experiments.sh
 
 ## Corpus
 
-30,184 documents: 28,269 Carnegie Museum of Art artworks, 60 Wikipedia articles, and about 1,850 pages from city, tax, events, museum, culture, food-festival, pro-sports and college-athletics sites. Answer coverage on the dev set: 106/121 short-answer questions (87.6%).
+31,355 documents (4.9M words): 28,269 Carnegie Museum of Art artworks, 1,172 Wikipedia articles, and 1,914 pages from city, tax, events, museum, culture, food-festival, pro-sports and college-athletics sites. Answer coverage on the dev set: 109/121 short-answer questions (90.1%).
 
 ## Dev results
 
