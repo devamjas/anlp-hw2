@@ -107,3 +107,4 @@ Answer style: `short` returns a bare answer; `sentence` always returns one sente
 |---|---|---|---|---|---|---|
 | devamjas_1 | 100w, RRF + fallback, adaptive | 41.71 | 40.54 | 38.14 | 34.01 | 3.167 |
 | devamjas_2 | final corpus, 100w, RRF + fallback, adaptive | 46.16 | 44.22 | 42.26 | 36.98 | 3.447 |
+| devamjas_3 | final corpus, 100w, RRF + fallback, sentence | 56.27 | 49.42 | 69.14 | 43.84 | 3.507 |

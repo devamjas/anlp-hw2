@@ -7,3 +7,5 @@ data/index/
 data/external/
 *.progress
 PROJECT_NOTES.md
+cloud/prompts.jsonl
+cloud/answers.json
