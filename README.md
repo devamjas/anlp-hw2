@@ -29,6 +29,7 @@ cmoa.py (CMOA open collection data) ────┤
 | `src/rag/retrieve.py` | BM25 (`bm25s`), dense (`BAAI/bge-small-en-v1.5` + FAISS), reciprocal rank fusion, weighted score fusion, cross-encoder rerank (`BAAI/bge-reranker-base`) |
 | `src/rag/reader.py` | `Qwen2.5-7B-Instruct` (4-bit, MLX); short answers, or one sentence for descriptive questions when adaptive |
 | `src/rag/run.py` | `build`, `answer`, `retrieval-eval` commands |
+| `src/rag/remote.py`, `cloud/cloud_reader.ipynb` | Export prompts, run a larger reader on Colab, import its answers |
 | `scripts/experiments.sh` | All dev-set runs |
 | `scripts/progress.py` | Live progress bars for running jobs |
 
@@ -85,6 +86,7 @@ bash scripts/experiments.sh
 | 100w, RRF + fallback, adaptive style | 44.6 | 59.2 | 59.9 | 58.9 |
 | 100w, RRF + fallback, sentence style | 0.6 | 26.1 | 64.7 | 25.1 |
 | final corpus, 100w, RRF + fallback, adaptive | 45.2 | 60.6 | 60.7 | 60.0 |
+| same, Qwen2.5-14B reader with 7B backup | 47.8 | 61.5 | 63.3 | 60.6 |
 
 The final corpus adds 1,172 Wikipedia articles (category and list pages), Arcade Comedy Theater, Pittsburgh Savoyards, college coaches pages and social-media handles (index `data/index/c100v2`).
 
@@ -108,3 +110,8 @@ Answer style: `short` returns a bare answer; `sentence` always returns one sente
 | devamjas_1 | 100w, RRF + fallback, adaptive | 41.71 | 40.54 | 38.14 | 34.01 | 3.167 |
 | devamjas_2 | final corpus, 100w, RRF + fallback, adaptive | 46.16 | 44.22 | 42.26 | 36.98 | 3.447 |
 | devamjas_3 | final corpus, 100w, RRF + fallback, sentence | 56.27 | 49.42 | 69.14 | 43.84 | 3.507 |
+| devamjas_4 | same, Qwen2.5-14B reader with 7B backup | 54.99 | 46.33 | 70.16 | 40.81 | 3.507 |
+
+## Larger reader on a cloud GPU
+
+`src/rag/remote.py export` writes the retrieved prompts to `cloud/prompts.jsonl`; `cloud/cloud_reader.ipynb` answers them with Qwen2.5-14B-Instruct (4-bit) on a Colab T4, saving progress to Google Drive; `src/rag/remote.py import` scores the answers, using the 7B outputs for any question the 14B model left unanswered or refused.

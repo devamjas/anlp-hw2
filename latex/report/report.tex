@@ -139,7 +139,7 @@ We also tried \textbf{cross-encoder reranking}: the top 50 from weighted fusion 
 Two additions.
 \textbf{Refusal fallback}: if the answer still looks like a refusal (``unknown'', ``TBD'', ``not mentioned''), we retry with $2k$ chunks, then closed-book.
 \textbf{Answer style}: \emph{short} returns a bare answer; \emph{sentence} always returns one sentence; \emph{adaptive} uses a sentence only for descriptive questions (``what is X'', ``significance'', ``known for'') and a bare answer for lookups (artworks, dates, times, names, counts), chosen by two regular expressions over the question.
-We also tried Qwen2.5-14B in 4-bit, but with the retrieval models loaded it pushed the machine into heavy swapping (about 9\,GB) and was abandoned.
+Qwen2.5-14B in 4-bit did not fit locally next to the retrieval models (about 9\,GB of swap), so we exported the retrieved prompts and ran it on a Colab T4 GPU with 4-bit NF4 weights and batched greedy decoding. The run stopped near the end on GPU memory and the free quota, so any question the 14B model left unanswered or refused falls back to the 7B system's answer. The 14B model refuses more politely (``the context does not provide\ldots''), so the refusal patterns were widened to catch those.
 
 \subsection{Baselines}
 
@@ -194,14 +194,15 @@ All dev numbers are on \texttt{public\_evaluation\_data.json} ($n{=}157$) with o
     RRF, adaptive style & 44.6 & 59.2 & 59.9 & 58.9 \\
     \midrule
     \multicolumn{5}{l}{\emph{Final corpus (broader Wikipedia, new sites)}} \\
-    RRF, adaptive (final) & \textbf{45.2} & \textbf{60.6} & 60.7 & \textbf{60.0} \\
+    RRF, adaptive (final) & 45.2 & 60.6 & 60.7 & 60.0 \\
+    \quad 14B reader, 7B backup & \textbf{47.8} & \textbf{61.5} & \textbf{63.3} & \textbf{60.6} \\
     \bottomrule
   \end{tabular}
   \caption{End-to-end results on the public evaluation set ($n{=}157$). Rec.\ is answer recall, R-L is ROUGE-L. Single runs with greedy decoding.}
   \label{tab:results}
 \end{table}
 
-\paragraph{Leaderboard.} The leaderboard (150 different questions, hidden answers) reports F1, recall, ROUGE averaged over ROUGE-1/2/L, and an LLM judge (1--5), and ranks by the mean of the four after rescaling the judge to $[0,1]$. Our first submission (100-word chunks, RRF, adaptive, before the Wikipedia expansion) scored 41.71 total: F1 40.54, recall 38.14, ROUGE 34.01, judge 3.17. The final system scored 46.16: F1 44.22, recall 42.26, ROUGE 36.98, judge 3.45. The broader Wikipedia mainly helps the leaderboard's general-history questions. On the leaderboard our recall is slightly below our F1, while near the top of the board recall exceeds F1 by about 20 points. The leaderboard's references are therefore longer than our answers, unlike most dev references. Switching the same system to sentence answers confirmed this. Total rose to 56.27 (F1 49.42, recall 69.14, ROUGE 43.84, judge 3.51), and F1 rose as well, which happens only when the references themselves are sentences. On dev the same switch cost 34 F1 points: the best answer format depends on how the references were written, and the two sets were written differently.
+\paragraph{Leaderboard.} The leaderboard (150 different questions, hidden answers) reports F1, recall, ROUGE averaged over ROUGE-1/2/L, and an LLM judge (1--5), and ranks by the mean of the four after rescaling the judge to $[0,1]$. Our first submission (100-word chunks, RRF, adaptive, before the Wikipedia expansion) scored 41.71 total: F1 40.54, recall 38.14, ROUGE 34.01, judge 3.17. The final system scored 46.16: F1 44.22, recall 42.26, ROUGE 36.98, judge 3.45. The broader Wikipedia mainly helps the leaderboard's general-history questions. On the leaderboard our recall is slightly below our F1, while near the top of the board recall exceeds F1 by about 20 points. The leaderboard's references are therefore longer than our answers, unlike most dev references. Switching the same system to sentence answers confirmed this. Total rose to 56.27 (F1 49.42, recall 69.14, ROUGE 43.84, judge 3.51), and F1 rose as well, which happens only when the references themselves are sentences. On dev the same switch cost 34 F1 points: the best answer format depends on how the references were written, and the two sets were written differently. A fourth submission with the 14B reader (and 7B backup) scored 54.99 (F1 46.33, recall 70.16, ROUGE 40.81, judge 3.51). Recall rose by one point, but its sentences were longer (20 vs.\ 16 words on average), which cost three points each of F1 and ROUGE. The judge score was unchanged, so the larger reader did not make answers more correct here, only wordier.
 
 \paragraph{Test submissions.} For the 250-question test set, \texttt{system\_output\_1} is the final system, \texttt{system\_output\_2} the same system with short answers, and \texttt{system\_output\_3} the same system with weighted fusion plus reranking.
 

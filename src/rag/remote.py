@@ -6,12 +6,19 @@ from tqdm import tqdm
 
 from .metrics import score
 from .reader import build_messages
+from .run import is_refusal
 
 JOBS = [
+    ("leaderboard", "leaderboard_queries.json", ["sentence"]),
     ("dev", "public_evaluation_data.json", ["adaptive"]),
-    ("leaderboard", "leaderboard_queries.json", ["adaptive", "sentence"]),
-    ("test", "test_set_day_3.json", ["adaptive", "short"]),
+    ("test", "test_set_day_3.json", ["adaptive"]),
 ]
+
+BACKUP = {
+    "leaderboard|sentence": "leaderboard/leaderboard_devamjas_v3_sentence.json",
+    "dev|adaptive": "outputs/dev_c100v2_rrf_adaptive.json",
+    "test|adaptive": "system_outputs_day3/system_output_1.json",
+}
 
 
 def cmd_export(args):
@@ -32,11 +39,19 @@ def cmd_export(args):
 
 def cmd_import(args):
     answers = json.load(open(args.answers))
+    answers = answers.get("answers", answers)
     tag = args.tag
     for name, path, styles in JOBS:
         questions = json.load(open(path))
         for style in styles:
-            preds = {q["id"]: answers[f"{name}|{style}|{q['id']}"] for q in questions}
+            backup = json.load(open(BACKUP[f"{name}|{style}"]))
+            preds, used = {}, 0
+            for q in questions:
+                a = answers.get(f"{name}|{style}|{q['id']}", "")
+                if is_refusal(a):
+                    a, used = backup[q["id"]], used + 1
+                preds[q["id"]] = a
+            print(f"{name} {style}: {len(questions) - used} from {tag}, {used} from backup")
             if name == "dev":
                 out = f"outputs/dev_{tag}_{style}.json"
                 result = {"config": {"out": out, "reader": tag, "style": style}, "n": len(questions), **score(preds, questions)}

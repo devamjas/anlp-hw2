@@ -17,7 +17,9 @@ def cmd_build(args):
 
 
 REFUSALS = re.compile(r"\b(unknown|not (mentioned|provided|specified|available|listed|stated|found|given)|n/a|tbd|tba|"
-                      r"no information|cannot be determined|does not (say|mention|contain|specify))\b", re.I)
+                      r"no information|cannot be determined|does not (say|mention|contain|specify|provide|have|include)|"
+                      r"do not (provide|have|include|mention|specify)|no specific|not explicitly|there is no (information|mention))\b",
+                      re.I)
 
 
 def is_refusal(answer):
