@@ -22,14 +22,13 @@
 \author{
   devamjas \\
   \texttt{devamjas@andrew.cmu.edu} \\[4pt]
-  {\small Personal study write-up, prepared after the deadline}
 }
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-We build a retrieval-augmented question answering system for facts about Pittsburgh and Carnegie Mellon University. The knowledge resource has 31{,}355 documents (4.9M words): a polite crawl of 25 city, event, museum, food and sports sites, 1{,}172 Wikipedia articles, and the Carnegie Museum of Art's open collection data. Documents are split into 100-word chunks, retrieved with BM25 and a \texttt{bge-small} dense index combined by reciprocal rank fusion, and read by a 4-bit Qwen2.5-7B-Instruct model. On the 157-question public evaluation set, retrieval lifts F1 from 11.3 (closed-book) to 60.6. Most of the gain after the first working system came from data, not modelling: three extraction bugs, one open dataset and a broader Wikipedia crawl were worth more than reranking or tuning the fusion. An adaptive answer style, short for lookups and one sentence for descriptive questions, adds 2.4 F1 by matching how reference answers are written.
+We build a retrieval-augmented question answering system for factual questions about Pittsburgh and Carnegie Mellon University. Our knowledge resource contains 31,355 documents (4.9M words), collected from 25 local websites, 1,172 Wikipedia articles, and the Carnegie Museum of Art's open collection dataset. We split documents into 100-word chunks and combine BM25 and \texttt{bge-small} dense retrieval using reciprocal rank fusion, with a 4-bit Qwen2.5-7B-Instruct model generating the answers. On the 157-question public evaluation set, our system improves F1 from 11.3 (closed-book) to 60.6, and to 61.5 with a larger 14B reader run on a cloud GPU. Our experiments show that improving data coverage and extraction quality contributed more to performance than reranking or fusion tuning. In particular, fixing three extraction bugs and expanding the corpus produced the largest gains. We also found that answer formatting matters under token-overlap metrics: an adaptive strategy that uses short answers for factual lookups and sentences for descriptive questions improved F1 by another 2.4 points.
 \end{abstract}
 
 \section{Introduction}
@@ -72,11 +71,11 @@ We started from the sources listed in the handout and added sources whenever an 
 Three additions mattered most.
 \textbf{(1) CMOA collection data.} About 38\% of dev questions ask for an artwork's artist, accession number, credit line, acquisition date, department or location. The museum's collection website is a JavaScript app whose API is behind a bot-protection layer, so we did not crawl it. Instead we used the museum's own CC0 release of its collection data \citep{cmoa2016collection} and turned each of the 28{,}269 artworks into a short document with one \texttt{field: value} line per attribute.
 \textbf{(2) College athletics.} Schedules for Pitt, Duquesne, Robert Morris and Chatham come from the text-only schedule and coaches pages of their athletics sites, for 14 sports each.
-\textbf{(3) Broader Wikipedia.} By the same keyword rules as Table~\ref{tab:category}, the leaderboard turned out to be 48\% general-history questions (72 of 150), against 20\% in dev. We expanded from 60 hand-picked articles to 1{,}172 by following links out of 22 Pittsburgh categories and 6 list pages, plus links from the main articles whose titles name Pittsburgh places or institutions.
+\textbf{(3) Broader Wikipedia.} By the same keyword rules as Table~\ref{tab:category}, 48\% of leaderboard questions (72 of 150) are general-history questions, against 20\% in dev. We expanded from 60 hand-picked articles to 1{,}172 by following links out of 22 Pittsburgh categories and 6 list pages, plus links from the main articles whose titles name Pittsburgh places or institutions.
 
 \subsection{Extraction and cleaning}
 
-The crawler is breadth-first and domain-restricted, with per-site depth, page caps and allow/deny URL patterns. Fetching uses \texttt{requests} with an SQLite response cache (\texttt{requests-cache}), so re-running the extractor never re-downloads pages. It pauses 1\,s after each real download, retries with exponential backoff, honours \texttt{Retry-After} on HTTP 429, and logs every failed URL with its status. HTML is parsed with Beautiful Soup \citep{richardson2007bs4}; PDFs (tax regulations, the 2025 city budget) with \texttt{pypdf}. We drop script, style, nav, footer, aside, button and iframe elements plus Wikipedia boilerplate (edit links, citation marks, reference lists, navboxes). Tables are rendered as one line per row (\texttt{cell | cell | cell}), which keeps a player and his college on the same line. Social-media handles are recovered from footer links before the footer is removed. Each document's title is its \texttt{<title>} plus meta description.
+The crawler is breadth-first and domain-restricted, with per-site depth, page caps and allow/deny URL patterns. Fetching uses \texttt{requests} with an SQLite response cache (\texttt{requests-cache}), so re-running the extractor never re-downloads pages. It pauses 1\,s after each real download, retries with exponential backoff, honours \texttt{Retry-After} on HTTP 429, and logs every failed URL with its status. HTML is parsed with Beautiful Soup \citep{richardson2007bs4}; PDFs (tax regulations, the 2025 city budget) with \texttt{pypdf}. We drop script, style, nav, footer, aside, button and iframe elements plus Wikipedia boilerplate (edit links, citation marks, reference lists, navboxes). Tables are rendered as one line per row (\texttt{cell | cell | cell}), which keeps a player and his college on the same line. Social-media handles are recovered from footer links before the footer is removed. Each document's title combines the HTML \texttt{<title>} and meta description.
 
 Coverage, the share of dev questions whose short gold answer appears verbatim anywhere in the corpus, was our main data metric. Table~\ref{tab:coverage} tracks it. Three extraction bugs only surfaced through it:
 removing elements whose class name contained words like ``menu'' deleted the entire page on Wikipedia, whose \texttt{<html>} tag matched;
@@ -105,7 +104,7 @@ Britannica and Little Italy Days returned HTTP 403, and the Heinz History Center
 
 \subsection{Annotated training data}
 
-We annotated no data and trained nothing. The reader is used zero-shot. With a strong instruction-tuned reader, and the public evaluation set already available for model selection, the time was better spent on the knowledge resource, which coverage showed was the binding constraint.
+We did not annotate additional data or train any models. The reader is used zero-shot. With a strong instruction-tuned reader, and the public evaluation set already available for model selection, the time was better spent on the knowledge resource, which coverage showed was the binding constraint.
 
 \subsection{Other data}
 
@@ -116,7 +115,7 @@ The only external dataset is the CMOA collection release (CC0 1.0). Its snapshot
 
 \subsection{Chunking}
 
-Documents are split on line boundaries, which after extraction correspond to paragraphs, list items or table rows, and lines are packed greedily into chunks of at most $W$ words. A line longer than $W$ is split into $W$-word pieces. When a chunk closes, its trailing lines up to $O$ words are carried into the next chunk as overlap. Every chunk is prefixed with its document title, so a schedule row such as ``Nov 24 \ldots{} Stevenson'' still says which team and sport it belongs to. Identical chunks are removed. Short documents (one CMOA artwork) become a single chunk. We tried $W{=}200, O{=}40$ (39{,}760 chunks) and $W{=}100, O{=}20$ (72{,}070 chunks on the final corpus).
+Documents are split on line boundaries, which after extraction correspond to paragraphs, list items or table rows, and lines are packed greedily into chunks of at most $W$ words. A line longer than $W$ is split into $W$-word pieces. When a chunk closes, its trailing lines up to $O$ words are carried into the next chunk as overlap. Every chunk is prefixed with its document title, so a schedule row such as ``Nov 24 \ldots{} Stevenson'' still says which team and sport it belongs to. Identical chunks are removed. Short documents, such as individual CMOA artwork records, form a single chunk. We tried $W{=}200, O{=}40$ (39{,}760 chunks) and $W{=}100, O{=}20$ (72{,}070 chunks on the final corpus).
 
 \subsection{Dense retrieval}
 
@@ -135,11 +134,12 @@ We also tried \textbf{cross-encoder reranking}: the top 50 from weighted fusion 
 
 \subsection{Reader}
 
-\texttt{Qwen2.5-7B-Instruct} \citep{qwen2025qwen25}, open-weight on Hugging Face, released September 2024 and well under the 32B limit, run as a 4-bit MLX conversion \citep{mlx2023} on an Apple M5 with 16\,GB of memory. Decoding is greedy with at most 32 new tokens (64 for sentence answers). The system prompt asks for only the answer and forbids ``unknown''. The user turn lists the numbered chunks followed by the question.
-Two additions.
+\texttt{Qwen2.5-7B-Instruct} \citep{qwen2025qwen25}, open-weight on Hugging Face, released September 2024 and well under the 32B limit, run as a 4-bit MLX conversion \citep{mlx2023} on an Apple M5 with 16\,GB of memory. Decoding is greedy with at most 32 new tokens (64 for sentence answers). The system prompt sets the answer style and forbids ``unknown''. The user turn lists the numbered chunks followed by the question.
+We add two components.
 \textbf{Refusal fallback}: if the answer still looks like a refusal (``unknown'', ``TBD'', ``not mentioned''), we retry with $2k$ chunks, then closed-book.
 \textbf{Answer style}: \emph{short} returns a bare answer; \emph{sentence} always returns one sentence; \emph{adaptive} uses a sentence only for descriptive questions (``what is X'', ``significance'', ``known for'') and a bare answer for lookups (artworks, dates, times, names, counts), chosen by two regular expressions over the question.
-Qwen2.5-14B in 4-bit did not fit locally next to the retrieval models (about 9\,GB of swap), so we exported the retrieved prompts and ran it on a Colab T4 GPU with 4-bit NF4 weights and batched greedy decoding. The run stopped near the end on GPU memory and the free quota, so any question the 14B model left unanswered or refused falls back to the 7B system's answer. The 14B model refuses more politely (``the context does not provide\ldots''), so the refusal patterns were widened to catch those.
+
+The 4-bit Qwen2.5-14B model could not fit in memory alongside the retrieval models (about 9\,GB of swap), so we exported the retrieved prompts and ran it on a Colab T4 GPU with 4-bit NF4 weights and batched greedy decoding. The run stopped near the end on GPU memory and the free quota, so any question the 14B model left unanswered or refused falls back to the 7B system's answer. The 14B model refuses more politely (``the context does not provide\ldots''), so the refusal patterns were widened to catch those.
 
 \subsection{Baselines}
 
@@ -148,7 +148,7 @@ The closed-book baseline is the same reader with no context. Sparse-only and den
 \section{Results}
 \label{sec:results}
 
-All dev numbers are on \texttt{public\_evaluation\_data.json} ($n{=}157$) with our implementation of SQuAD-style exact match and token F1 \citep{rajpurkar2016squad}, answer recall (share of reference tokens in the prediction) and ROUGE-L, each taking the best reference per question. Table~\ref{tab:retrieval} measures retrieval alone; Table~\ref{tab:results} the full system.
+All dev numbers are on \texttt{public\_evaluation\_data.json} ($n{=}157$) with our implementation of SQuAD-style exact match and token F1 \citep{rajpurkar2016squad}, answer recall (share of reference tokens in the prediction) and ROUGE-L, each taking the best reference per question. Table~\ref{tab:retrieval} measures retrieval alone; Table~\ref{tab:results} the full system. The primary system is the 7B reader with RRF and adaptive answers (60.6 F1); the 14B variant (61.5 F1) is reported separately because it needed a cloud GPU and a 7B backup.
 
 \begin{table}[t]
   \centering
@@ -164,7 +164,7 @@ All dev numbers are on \texttt{public\_evaluation\_data.json} ($n{=}157$) with o
     Weighted + rerank & 58.0 & 58.0 \\
     \bottomrule
   \end{tabular}
-  \caption{Retrieval hit rate (\%): a short reference answer appears in the top-5 chunks. Dev set, $n{=}157$, before the Wikipedia expansion.}
+  \caption{Retrieval hit rate (\%): share of all 157 dev questions for which a short (at most six-word) reference answer appears in the top-5 chunks. Questions with only long references count as misses. Measured before the Wikipedia expansion.}
   \label{tab:retrieval}
 \end{table}
 
@@ -202,12 +202,33 @@ All dev numbers are on \texttt{public\_evaluation\_data.json} ($n{=}157$) with o
   \label{tab:results}
 \end{table}
 
-\paragraph{Leaderboard.} The leaderboard (150 different questions, hidden answers) reports F1, recall, ROUGE averaged over ROUGE-1/2/L, and an LLM judge (1--5), and ranks by the mean of the four after rescaling the judge to $[0,1]$. Our first submission (100-word chunks, RRF, adaptive, before the Wikipedia expansion) scored 41.71 total: F1 40.54, recall 38.14, ROUGE 34.01, judge 3.17. The final system scored 46.16: F1 44.22, recall 42.26, ROUGE 36.98, judge 3.45. The broader Wikipedia mainly helps the leaderboard's general-history questions. On the leaderboard our recall is slightly below our F1, while near the top of the board recall exceeds F1 by about 20 points. The leaderboard's references are therefore longer than our answers, unlike most dev references. Switching the same system to sentence answers confirmed this. Total rose to 56.27 (F1 49.42, recall 69.14, ROUGE 43.84, judge 3.51), and F1 rose as well, which happens only when the references themselves are sentences. On dev the same switch cost 33 F1 points: the best answer format depends on how the references were written, and the two sets were written differently. A fourth submission with the 14B reader (and 7B backup) scored 54.99 (F1 46.33, recall 70.16, ROUGE 40.81, judge 3.51). Recall rose by one point, but its sentences were longer (18 vs.\ 16 words on average), which cost three points each of F1 and ROUGE. The judge score was unchanged, so the larger reader did not make answers more correct here, only wordier.
+\paragraph{Leaderboard.} The leaderboard (150 different questions, hidden answers) reports F1, recall, ROUGE averaged over ROUGE-1/2/L, and an LLM judge (1--5), and ranks by the mean of the four after rescaling the judge to $[0,1]$. Our first submission (100-word chunks, RRF, adaptive, before the Wikipedia expansion) scored 41.71 total: F1 40.54, recall 38.14, ROUGE 34.01, judge 3.17. The final system scored 46.16: F1 44.22, recall 42.26, ROUGE 36.98, judge 3.45. The broader Wikipedia mainly helps the leaderboard's general-history questions.
+
+On the leaderboard our recall is slightly below our F1, while near the top of the board recall exceeds F1 by about 20 points, which suggested that the leaderboard's references are longer than our answers. Switching the same system to sentence answers raised the total to 56.27 (F1 49.42, recall 69.14, ROUGE 43.84, judge 3.51). Longer answers are expected to raise recall, but F1 rose as well, which suggests that many leaderboard references are themselves sentences. On dev the same switch cost 33 F1 points: the best answer format depends on how the references were written, and the two sets were written differently.
+
+A fourth submission with the 14B reader (and 7B backup) scored 54.99 (F1 46.33, recall 70.16, ROUGE 40.81, judge 3.51). Recall rose by one point, but its sentences were longer (18 vs.\ 16 words on average), which cost three points each of F1 and ROUGE. The judge score was unchanged, so the larger reader did not make answers more correct here, only wordier.
 
 \paragraph{Test submissions.} For the 250-question test set, \texttt{system\_output\_1} is the final system, \texttt{system\_output\_2} the same system with short answers, and \texttt{system\_output\_3} the same system with the 14B reader and 7B backup, the best system on dev.
 
 \section{Analysis}
 \label{sec:analysis}
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{p{4.6cm}p{2.3cm}p{2.3cm}p{2.3cm}p{2.6cm}}
+    \toprule
+    Question & Closed-book & BM25 (200w) & Final & Reference \\
+    \midrule
+    Which artist is credited for the CMOA painting ``Metamorphosis (Homage to Kafka)''? & Kara Walker & Manuel Rivera & Manuel Rivera & Manuel Rivera \\
+    Which college does the Steelers roster list for Carson Bruener? & Carnegie Mellon University & Washington & Washington & Washington \\
+    Which Pittsburgh bridge is the longest? & Fort Pitt Bridge & Fort Duquesne Bridge & McKees Rocks Bridge & The Fort Pitt Bridge, spanning the Monongahela River, \ldots \\
+    How did the CMOA acquire ``Blah, Blah, Blah''? & Gift & Gift of the artist in honor of Richard Armstrong & Gift of the artist in honor of Richard Armstrong & Gift \\
+    \bottomrule
+  \end{tabular}
+  \caption{Outputs of three systems on the same dev questions.}
+  \label{tab:examples}
+\end{table*}
 
 \subsection{Performance by question type}
 
@@ -235,14 +256,14 @@ We assigned dev questions to six categories with keyword rules on the question t
   \label{tab:category}
 \end{table}
 
-To see where the remaining errors come from, we traced each wrong answer (F1 $<0.5$) of the 100-word RRF system to the stage that failed. 33 questions have only long, sentence-style references, so even a correct short answer scores low. 11 have answers that are not in the corpus. 12 are in the corpus but not in the top 5. In 11 the answer was retrieved but the reader chose wrong, typically the wrong row of a schedule table. So answer style was the largest single bucket, which motivated the adaptive style.
+To see where the remaining errors come from, we traced each wrong answer (F1 $<0.5$) of the 100-word RRF system to the stage that failed. 33 questions have only long, sentence-style references, so even a correct short answer scores low. 11 have answers that are not in the corpus. 12 are in the corpus but not in the top 5. In 11 cases, the correct answer was retrieved, but the reader selected an incorrect answer, typically the wrong row of a schedule table. So answer style was the largest single bucket, which motivated the adaptive style.
 
 \subsection{Comparing variations}
 
-\textbf{Chunk size} was the most useful retrieval change. 100-word chunks lift retrieval hit rate for every retriever (Table~\ref{tab:retrieval}). End to end, rerank with fallback improves from 53.9 to 55.2 F1, and the best 100-word system beats the best 200-word system by 2.9 F1. Smaller chunks put less unrelated text around a table row or a date, and with titles prepended they still carry their context.
-\textbf{Reranking} raised hit rate (54.1$\rightarrow$58.0 at 200 words) but not answer quality (53.9 F1 in both cases). At 100 words it lost 1.6 F1 to plain RRF. At 200 words, the top-50 weighted-fusion pool that the reranker reorders already contains the answer for 95 of the 106 answerable questions, so there is little left for a reranker to recover, and its reordering did not help the reader.
+\textbf{Chunk size} was the most useful retrieval change. 100-word chunks lift retrieval hit rate for every retriever (Table~\ref{tab:retrieval}). End to end, rerank with fallback improves from 53.9 to 55.2 F1, and with short answers the best 100-word system beats the best 200-word system by 2.9 F1. Smaller chunks put less unrelated text around a table row or a date, and with titles prepended they still carry their context.
+\textbf{Reranking} raised hit rate (54.1$\rightarrow$58.0 at 200 words) but not answer quality (53.9 F1 in both cases). With 100-word chunks, reranking was 1.6 F1 worse than plain RRF. At 200 words, the top-50 weighted-fusion pool that the reranker reorders already contains the answer for 95 of the 106 answerable questions, so there is little left for a reranker to recover, and its reordering did not help the reader.
 \textbf{Answer style} interacts strongly with the metrics. Always answering in a sentence raises recall to 64.7 but collapses F1 to 26.1. The adaptive rule switches only 25 of 157 questions to sentence answers and gains 2.4 F1. Before running it, we simulated the rule by restating question words around the existing short answers. The simulated gain held on two random halves of the dev set (+3.7 and +2.9 F1), which suggests the rule is not tuned to individual questions.
-\textbf{Corpus expansion} added 1.4 F1 on dev, with the largest share from general-history questions (+5.7 F1 in that category). Run-to-run variation is zero under greedy decoding, but differences of about one point still rest on only a handful of questions.
+\textbf{Corpus expansion} added 1.4 F1 on dev, with the largest share from general-history questions (+5.7 F1 in that category). Decoding is greedy, so there is no sampling variance, but differences of about one point still rest on only a handful of questions.
 
 \subsection{Retrieval versus closed-book}
 
@@ -250,32 +271,17 @@ Retrieval improves 113 of 157 questions, leaves 34 unchanged and hurts 10. The g
 
 \subsection{Dense, sparse, and hybrid}
 
-BM25 beats dense end to end (52.2 vs 48.0 F1). On question pairs, BM25 wins 22 times and dense 18. BM25 wins concentrate in general-history (9) and government/tax (5), where questions share rare exact terms with the answer text (``Payroll Expense Tax'', ``Duquesne Incline''). Dense wins are spread out and include food questions, which are phrased descriptively (``authentic Brazilian steakhouse experience''). On CMOA both are strong, because the quoted title is also a strong semantic match. Of the two fusions, RRF retrieves slightly better (54.8 vs 54.1 hit rate) yet weighted fusion answers better (53.3 vs 50.4 F1). Hit rate only asks whether the answer is somewhere in the top 5. Weighted fusion keeps BM25's high-confidence exact matches at the top, while RRF can promote a dense-only distractor to rank 1. By category (Table~\ref{tab:category}), the two fusions tie on sports, and weighted fusion is ahead on events (+9.3), government/tax (+10.0) and general history (+4.1). These are the categories where dense retrieval is far weaker than BM25. RRF gives the weak list an equal vote by rank, while weighted fusion lets BM25's much larger scores dominate. Fusion clearly beats both single retrievers only on sports (+3.9 over BM25 for either fusion). On CMOA all four retrievers are within 2.1 points. RRF is ahead only on food (7 questions, all near zero). With 100-word chunks RRF also retrieves better (58.0 vs 57.3). We did not rerun weighted fusion end to end at that size, and kept RRF.
+BM25 beats dense end to end (52.2 vs 48.0 F1). On question pairs, BM25 wins 22 times and dense 18. BM25 wins concentrate in general-history (9) and government/tax (5), where questions share rare exact terms with the answer text (``Payroll Expense Tax'', ``Duquesne Incline''). Dense wins are spread out and include food questions, which are phrased descriptively (``authentic Brazilian steakhouse experience''). On CMOA both are strong, because the quoted title is also a strong semantic match.
+
+Of the two fusions, RRF retrieves slightly better (54.8 vs 54.1 hit rate) yet weighted fusion answers better (53.3 vs 50.4 F1). Hit rate only asks whether the answer is somewhere in the top 5. Weighted fusion keeps BM25's high-confidence exact matches at the top, while RRF can promote a dense-only distractor to rank 1. By category (Table~\ref{tab:category}), the two fusions tie on sports, and weighted fusion is ahead on events (+9.3), government/tax (+10.0) and general history (+4.1). These are the categories where dense retrieval is weaker than BM25. RRF gives the weak list an equal vote by rank, while weighted fusion lets BM25's much larger scores dominate. Fusion clearly beats both single retrievers only on sports (+3.9 over BM25 for either fusion). On CMOA all four retrievers are within 2.1 points. RRF is ahead only on food (7 questions, all near zero). With 100-word chunks RRF also retrieves better (58.0 vs 57.3). We did not rerun weighted fusion end to end at that size, and kept RRF.
 
 \subsection{Example outputs}
 
 Table~\ref{tab:examples} compares systems on the same questions. The first two show the common case: closed-book invents a plausible answer, and every retrieval system recovers the right one. The third shows retrieval hurting. The fourth shows a correct answer that scores only 0.22 F1 because it is more specific than the reference.
 
-\begin{table*}[t]
-  \centering
-  \small
-  \begin{tabular}{p{4.6cm}p{2.3cm}p{2.3cm}p{2.3cm}p{2.6cm}}
-    \toprule
-    Question & Closed-book & BM25 (200w) & Final & Reference \\
-    \midrule
-    Which artist is credited for the CMOA painting ``Metamorphosis (Homage to Kafka)''? & Kara Walker & Manuel Rivera & Manuel Rivera & Manuel Rivera \\
-    Which college does the Steelers roster list for Carson Bruener? & Carnegie Mellon University & Washington & Washington & Washington \\
-    Which Pittsburgh bridge is the longest? & Fort Pitt Bridge & Fort Duquesne Bridge & McKees Rocks Bridge & The Fort Pitt Bridge, spanning the Monongahela River, \ldots \\
-    How did the CMOA acquire ``Blah, Blah, Blah''? & Gift & Gift of the artist in honor of Richard Armstrong & Gift of the artist in honor of Richard Armstrong & Gift \\
-    \bottomrule
-  \end{tabular}
-  \caption{Outputs of three systems on the same dev questions.}
-  \label{tab:examples}
-\end{table*}
-
 \section{Conclusion}
 
-A simple, well-measured pipeline gets most of the way. The decisive work was on the data: a coverage metric exposed three extraction bugs and two missing sources, and fixing them was worth more than any retrieval change. Both fusions beat either retriever alone on hit rate, but only weighted fusion turned that into better answers: how a fusion ranks the top few chunks matters more than its recall at $k$. Answer format matters as much as correctness under token-overlap metrics. With more time we would: shorten sentence answers for sentence-style references, since a larger reader mainly made them longer; replace the regex style switch with a learned classifier; add a held-out split for honest model selection; and crawl the remaining JavaScript-rendered event calendars with a headless browser.
+A simple, well-measured RAG pipeline gets most of the way. The most impactful improvements came from the data: tracking answer coverage exposed three extraction bugs and two missing sources, and fixing them was worth more than any retrieval change. Both fusions beat either retriever alone on hit rate, but only weighted fusion turned that into better answers: where the right chunk ranks among the top few matters more than whether it is retrieved at all. Answer format matters as much as correctness under token-overlap metrics, and a larger reader did not help on the leaderboard because it wrote longer sentences. With more time we would shorten sentence answers for sentence-style references, replace the regex style switch with a learned classifier, add a held-out split for honest model selection, and crawl the remaining JavaScript-rendered event calendars with a headless browser.
 
 \section*{Limitations}
 
@@ -283,7 +289,7 @@ All model selection used the 157-question dev set, which is also where we report
 
 \section*{Use of AI}
 
-This write-up and the system's code were produced with an AI coding assistant (Claude, via Claude Code), working interactively with the author. The assistant wrote the crawler, retrieval, reader and evaluation code, ran the experiments, and drafted this document from the logged results. The document was prepared after the assignment deadline as a personal study reference, not as a course submission.
+This project was built with an AI coding assistant (Claude, via Claude Code). The assistant proposed most of the technical approach, wrote the crawler, retrieval, reader and evaluation code, ran the experiments, and drafted this report from the logged results. The author directed the work throughout: setting goals and constraints, deciding which ideas, experiments and leaderboard submissions to pursue, running the cloud GPU job, working through each component of the code to understand it, and editing the report. AI tools were also used to proofread the report for language and to check its numbers against the experiment logs.
 
 \bibliography{custom}
 
