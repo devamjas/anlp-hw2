@@ -54,12 +54,12 @@ curl -L -o data/external/cmoa/cmoa.csv https://raw.githubusercontent.com/roll/co
 ## Index, evaluate, predict
 
 ```
-./.venv/bin/python -m src.rag.run build --words 100 --overlap 20 --index data/index/c100
+./.venv/bin/python -m src.rag.run build --words 100 --overlap 20 --index data/index/c100v2
 ./.venv/bin/python -m src.rag.run build --words 200 --overlap 40 --index data/index/c200
-./.venv/bin/python -m src.rag.run retrieval-eval --index data/index/c100
+./.venv/bin/python -m src.rag.run retrieval-eval --index data/index/c100v2
 bash scripts/experiments.sh
-./.venv/bin/python -m src.rag.run answer --questions test_set_day_2.json --index data/index/c100 \
-    --mode rrf --k 5 --fallback --adaptive --out system_outputs/system_output_3.json
+./.venv/bin/python -m src.rag.run answer --questions test_set_day_3.json --index data/index/c100v2 \
+    --mode rrf --k 5 --fallback --style adaptive --out system_outputs_day3/system_output_1.json
 ```
 
 ## Corpus
@@ -84,6 +84,18 @@ bash scripts/experiments.sh
 | 100w, rerank k=8 + fallback | 45.9 | 55.7 | 55.9 | 55.6 |
 | 100w, RRF + fallback, adaptive style | 44.6 | 59.2 | 59.9 | 58.9 |
 | 100w, RRF + fallback, sentence style | 0.6 | 26.1 | 64.7 | 25.1 |
+| final corpus, 100w, RRF + fallback, adaptive | 45.2 | 60.6 | 60.7 | 60.0 |
+
+The final corpus adds 1,172 Wikipedia articles (category and list pages), Arcade Comedy Theater, Pittsburgh Savoyards, college coaches pages and social-media handles (index `data/index/c100v2`).
+
+## Test outputs
+
+| File | Configuration |
+|---|---|
+| `system_outputs_day3/system_output_1.json` | final corpus, RRF + fallback, adaptive |
+| `system_outputs_day3/system_output_2.json` | final corpus, RRF + fallback, short |
+| `system_outputs_day3/system_output_3.json` | final corpus, weighted + rerank + fallback, adaptive |
+| `system_outputs/system_output_{1,2}.json` | day-2 test set, earlier 200-word systems |
 
 Fallback: when the reader answers "unknown" or similar, retry with twice as many chunks, then closed-book.
 
@@ -94,3 +106,4 @@ Answer style: `short` returns a bare answer; `sentence` always returns one sente
 | Submission | Configuration | Total | F1 | Recall | ROUGE | LLM judge |
 |---|---|---|---|---|---|---|
 | devamjas_1 | 100w, RRF + fallback, adaptive | 41.71 | 40.54 | 38.14 | 34.01 | 3.167 |
+| devamjas_2 | final corpus, 100w, RRF + fallback, adaptive | 46.16 | 44.22 | 42.26 | 36.98 | 3.447 |
